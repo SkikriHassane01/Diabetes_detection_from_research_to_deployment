@@ -57,7 +57,7 @@ def setup_logger(name: str, # ex if name="data_ingestion" => create directory un
         
         # Create error file handler for errors
         log_error_file = os.path.join(
-            log_error_file,
+            log_dir,
             f"{datetime.now().strftime('%Y_%m_%d')}_errors_{name}.log"
         )
         error_file_handler = RotatingFileHandler(
