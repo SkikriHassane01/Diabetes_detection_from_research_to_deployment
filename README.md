@@ -147,7 +147,7 @@ This setup ensures reliable, production-ready ML models with automated quality c
 - Automated retraining based on drift thresholds
 - Alert system for performance degradation
 
-## **Technical Stack Recommendations**
+## **Technical Stack used in this project**
 
 ### **Core Technologies**
 
