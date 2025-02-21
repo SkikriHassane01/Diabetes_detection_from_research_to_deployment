@@ -37,7 +37,7 @@ def setup_logger(name: str, # ex if name="data_ingestion" => create directory un
         
         # create formatter
         formatter = logging.Formatter(
-            '[%(asctime)s] %(levelname)s - %(name)s %(message)s',
+            '[%(asctime)s] | %(levelname)8s | [%(filename)s:%(lineno)4d] | %(name)15s | %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         
@@ -65,7 +65,7 @@ def setup_logger(name: str, # ex if name="data_ingestion" => create directory un
             maxBytes= 2 * 1024 * 1024,
             backupCount= 5
         )
-        error_file_handler.setLevel(log_level)
+        error_file_handler.setLevel(logging.ERROR)
         error_file_handler.setFormatter(formatter)
         logger.addHandler(error_file_handler)
 
