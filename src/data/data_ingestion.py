@@ -128,6 +128,3 @@ class DataIngestion:
     # extracted_dir = di.extracted_zip_file(zip_path)
     # file_path = di.find_data_file(extracted_dir)
     # data = di.read_data(file_path)
-    
-    
-    
