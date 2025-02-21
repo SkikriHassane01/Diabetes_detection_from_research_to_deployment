@@ -47,7 +47,7 @@ def setup_logger(name: str, # ex if name="data_ingestion" => create directory un
             f"{datetime.now().strftime('%Y_%m_%d')}_{name}.log"
         )
         file_handler = RotatingFileHandler(
-            log_dir,
+            log_file,
             maxBytes= 2 * 1024 * 1024, # 2MB
             backupCount= 5
         )
