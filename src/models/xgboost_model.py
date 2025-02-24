@@ -1,11 +1,11 @@
-from xgboost import XGBClassifier  # Changed import statement
 import numpy as np
 from typing import Dict, Any, Optional
 from src.models.base_model import BaseModel
+from xgboost import XGBClassifier
 
 class XGBoostModel(BaseModel):
     """
-    XGBoost implementation for diabetes classification.
+    XGBoost implementation for diabetes binary classification.
     """
     def __init__(self, model_params: Optional[Dict[str, Any]] = None):
         """
@@ -15,23 +15,20 @@ class XGBoostModel(BaseModel):
             model_params: Dictionary of model parameters
         """
         default_params = {
-               'n_estimators': 100,
-                'max_depth': 6,
-                'learning_rate': 0.01,
-                'min_child_weight': 5,
-                'gamma': 0.1,
-                'subsample': 0.8,
-                'colsample_bytree': 0.8,
-                'reg_alpha': 0.1,
-                'reg_lambda': 1.0,
-                'scale_pos_weight': 1,
-                'num_class': 3,
-                'objective': 'multi:softprob',
-                'random_state': 42,
-                'n_jobs': -1
+            'objective': 'binary:logistic',
+            'learning_rate': 0.1,
+            'max_depth': 6,
+            'min_child_weight': 1,
+            'subsample': 0.8,
+            'colsample_bytree': 0.8,
+            'tree_method': 'hist',
+            'scale_pos_weight': 1,
+            'random_state': 42,
+            'n_jobs': -1,
+            'verbosity': 0,
+            'eval_metric': 'logloss'  # Include eval_metric in model params instead of fit
         }
         
-        # Update default parameters with provided parameters
         if model_params:
             default_params.update(model_params)
             
@@ -39,35 +36,22 @@ class XGBoostModel(BaseModel):
     
     def build(self) -> None:
         """Build the XGBoost model with specified parameters."""
-        self.model = XGBClassifier(**self.model_params)  # Changed from xgb.XGBClassifier
+        self.model = XGBClassifier(**self.model_params)
     
     def train(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
-        """
-        Train the XGBoost model.
-        
-        Args:
-            X_train: Training features
-            y_train: Training labels
-        """
+        """Train the XGBoost model."""
         if self.model is None:
             self.build()
+            
+        self.model.fit(X_train, y_train)
         
-        self.model.fit(
-            X_train, 
-            y_train,
-            verbose=False
-        )
-        
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self, importance_type: str = 'gain') -> Dict[str, float]:
         """
         Get feature importance scores.
         
-        Returns:
-            Dictionary mapping feature indices to importance scores
+        Args:
+            importance_type: Type of feature importance ('weight', 'gain', 'cover')
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet")
-            
-        # Get feature importance scores
-        importance_scores = self.model.feature_importances_
-        return dict(enumerate(importance_scores))
+        return self.model.get_booster().get_score(importance_type=importance_type)

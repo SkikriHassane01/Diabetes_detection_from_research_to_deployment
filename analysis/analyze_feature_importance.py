@@ -11,12 +11,13 @@ warnings.filterwarnings('ignore')
 logger = setup_logger("Feature_importance")
 
 REPORT_DIST_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(__name__)), 'reports/feature_importance_figures'))
+
 def analyze_feature_importance(data: pd.DataFrame,
-                              output_dir: str = REPORT_DIST_DIR,
-                              target_column: str = 'Diabetes_012',
-                              n_estimators: int = 100,
-                              top_k: int = 15,
-                              figsize: Tuple[int, int] = (12, 8)) -> Dict:
+                             output_dir: str = REPORT_DIST_DIR,
+                             target_column: str = 'diabetes',
+                             n_estimators: int = 100,
+                             top_k: int = 8,
+                             figsize: Tuple[int, int] = (12, 8)) -> Dict:
     """
     Perform feature importance analysis using Random Forest.
     
@@ -35,11 +36,19 @@ def analyze_feature_importance(data: pd.DataFrame,
     os.makedirs(output_dir, exist_ok=True)
     
     # Prepare data
-    X = data.drop(columns=[target_column])
-    y = data[target_column]
+    # Handle categorical variables
+    df = data.copy()
+    categorical_columns = ['gender', 'smoking_history']
+    for col in categorical_columns:
+        df[col] = pd.factorize(df[col])[0]
+    
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
     
     # Random Forest feature importance
-    rf = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+    rf = RandomForestClassifier(n_estimators=n_estimators, 
+                              random_state=42,
+                              class_weight='balanced')
     
     try:
         rf.fit(X, y)
@@ -52,16 +61,25 @@ def analyze_feature_importance(data: pd.DataFrame,
         plt.title('Feature Importance (Random Forest)')
         plt.xlabel('Features')
         plt.ylabel('Importance')
+        plt.xticks(rotation=45, ha='right')
+        
+        # Add value labels on top of bars
+        for i, v in enumerate(rf_importances[:top_k]):
+            plt.text(i, v, f'{v:.3f}', ha='center', va='bottom')
+        
         plt.tight_layout()
         
         plt.savefig(os.path.join(output_dir, 'rf_feature_importance.png'), dpi=300)
         plt.close()
         logger.info(f"Successfully saving the feature importance plot in {output_dir}")
 
+        return dict(rf_importances)
+
     except Exception as e:
         logger.error(f"Error in Random Forest feature importance calculation: {str(e)}")
+        return None
 
-# if __name__ == "__main__":
-#     # Read the CSV file into a DataFrame first
-#     data = pd.read_csv("data/extracted/diabetes_data/diabetes_012_health_indicators_BRFSS2015.csv")
-#     analyze_feature_importance(data)
+if __name__ == "__main__":
+    data_path = 'data/extracted/diabetes_prediction_dataset/diabetes_prediction_dataset.csv'
+    data = pd.read_csv(data_path)
+    analyze_feature_importance(data)

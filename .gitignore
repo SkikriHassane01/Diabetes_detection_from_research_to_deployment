@@ -170,3 +170,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 notebooks/catboost_info/learn_error.tsv
+notebooks/catboost_info/learn/events.out.tfevents
+notebooks/catboost_info/time_left.tsv
+notebooks/catboost_info/test_error.tsv
+notebooks/catboost_info/catboost_training.json
+notebooks/models/optimized/optuna_study.pkl
+notebooks/catboost_info/tmp/cat_feature_index.8921ea84-37124abf-3d9487c5-b9390057.tmp
+notebooks/catboost_info/test/events.out.tfevents
+notebooks/catboost_info/tmp/cat_feature_index.b38246d4-5e31b676-845ff56a-4b61e06e.tmp

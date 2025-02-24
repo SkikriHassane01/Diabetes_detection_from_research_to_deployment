@@ -15,7 +15,7 @@ REPORT_DIST_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(__name__)), 
 
 def analyze_correlations(data: pd.DataFrame, 
                         output_dir: str = REPORT_DIST_DIR,
-                        target_column: str = 'Diabetes_012',
+                        target_column: str = 'diabetes',
                         figsize: Tuple[int, int] = (12, 10)) -> pd.DataFrame:
     """
     Analyze and visualize feature correlations.
@@ -32,32 +32,41 @@ def analyze_correlations(data: pd.DataFrame,
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Calculate correlation matrix
-    correlation_matrix = data.corr()
+    # Create copy of data for encoding
+    df = data.copy()
     
-    # TODO: Plot correlation heatmap
+    # Encode categorical variables
+    categorical_columns = ['gender', 'smoking_history']
+    for col in categorical_columns:
+        df[col] = pd.factorize(df[col])[0]
+    
+    # Calculate correlation matrix
+    correlation_matrix = df.corr()
+    
+    # Plot correlation heatmap
     plt.figure(figsize=figsize)
     
-    # crate a mask to show only the lower triangle
+    # Create a mask to show only the lower triangle
     mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
     sns.heatmap(correlation_matrix, 
-               mask=mask,  # Where mask=1: Hide value, Where mask=0: Show value  
+               mask=mask,  
                cmap='coolwarm', 
-               annot=False,
+               annot=True,
                center=0, 
                square=True, 
                linewidths=.5, 
+               fmt='.2f',
                cbar_kws={"shrink": .5})
     plt.title('Feature Correlation Matrix')
     plt.tight_layout()
     try:
         plt.savefig(os.path.join(output_dir, 'correlation_matrix.png'), dpi=300)
-        logger.info(f'the Feature Correlation plot is saved in {output_dir}')
+        logger.info(f'The Feature Correlation plot is saved in {output_dir}')
         plt.close()
     except Exception as e:
         logger.error(f"Failed to save the Feature Correlation matrix in {output_dir} ==> see the error {e}")
     
-    # TODO: Plot correlations with target variable
+    # Plot correlations with target variable
     target_corrs = correlation_matrix[target_column].sort_values(ascending=False)
     target_corrs = target_corrs.drop(target_column)
     
@@ -71,13 +80,14 @@ def analyze_correlations(data: pd.DataFrame,
     
     try:
         plt.savefig(os.path.join(output_dir, 'target_correlations.png'), dpi=300)
-        logger.info(f'the target correlations plot is saved in {output_dir}')
+        logger.info(f'The target correlations plot is saved in {output_dir}')
         plt.close()
     except Exception as e:
         logger.error(f"Failed to save the target correlations in {output_dir} ==> see the error {e}")
         
     return correlation_matrix
 
-# if __name__ == "__main__":
-#     data = pd.read_csv("data/extracted/diabetes_data/diabetes_012_health_indicators_BRFSS2015.csv")
-#     analyze_correlations(data)
+if __name__ == "__main__":
+    data_path = 'data/extracted/diabetes_prediction_dataset/diabetes_prediction_dataset.csv'
+    data = pd.read_csv(data_path)
+    analyze_correlations(data)

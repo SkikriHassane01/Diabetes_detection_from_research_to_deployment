@@ -122,9 +122,9 @@ class DataIngestion:
             logger.error(f"Error reading {data_file}: {str(e)}")
             return None   
         
-# if __name__ == "__main__":
-    # di = DataIngestion()
-    # zip_path = "data/raw/diabetes_data.zip"
-    # extracted_dir = di.extracted_zip_file(zip_path)
-    # file_path = di.find_data_file(extracted_dir)
-    # data = di.read_data(file_path)
+if __name__ == "__main__":
+    di = DataIngestion()
+    zip_path = "data/raw/diabetes_prediction_dataset.zip"
+    extracted_dir = di.extracted_zip_file(zip_path)
+    file_path = di.find_data_file(extracted_dir)
+    data = di.read_data(file_path)

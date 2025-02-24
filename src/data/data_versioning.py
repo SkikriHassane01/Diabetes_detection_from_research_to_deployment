@@ -197,11 +197,9 @@ class DataVersioner:
         del metadata[version_id]
         self._save_metadata(metadata)  
 
-# if __name__ == "__main__":
-#     versioner = DataVersioner()
-#     data = pd.read_csv("data\extracted\diabetes_data\diabetes_012_health_indicators_BRFSS2015.csv")
-#     version_id = versioner.version_dataset(data, "diabetes")
-#     print(version_id)
-#     versioner.list_versions("diabetes")
-#     versioner.delete_version('2025_02_21_23_49_32')
-#     versioner.list_versions("diabetes")   
+if __name__ == "__main__":
+    versioner = DataVersioner()
+    data_path = 'data/extracted/diabetes_prediction_dataset/diabetes_prediction_dataset.csv'
+    data = pd.read_csv(data_path)
+    version_id = versioner.version_dataset(data, "diabetes_original", "Original diabetes dataset")
+    versioner.list_versions("diabetes_original")

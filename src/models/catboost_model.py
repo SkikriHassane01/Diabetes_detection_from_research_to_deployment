@@ -18,15 +18,15 @@ class CatBoostModel(BaseModel):
             cat_features: List of indices for categorical features
         """
         default_params = {
-                'iterations': 100,
-                'depth': 6,
-                'learning_rate': 0.01,
-                'l2_leaf_reg': 5.0,
-                'rsm': 0.8,
-                'min_data_in_leaf': 20,
-                'loss_function': 'MultiClass',
-                'classes_count': 3,
-                'random_seed': 42
+            'iterations': 100,
+            'depth': 6,
+            'learning_rate': 0.1,
+            'l2_leaf_reg': 3.0,
+            'rsm': 0.8,
+            'subsample': 0.8,
+            'min_data_in_leaf': 10,
+            'random_seed': 42,
+            'verbose': False
         }
         
         # Update default parameters with provided parameters
@@ -55,7 +55,7 @@ class CatBoostModel(BaseModel):
             X_train, 
             y_train,
             cat_features=self.cat_features,
-            plot=False
+            verbose=False
         )
         
     def get_feature_importance(self, type: str = 'FeatureImportance') -> Dict[str, float]:
@@ -67,7 +67,7 @@ class CatBoostModel(BaseModel):
                  ('FeatureImportance', 'PredictionValuesChange', etc.)
             
         Returns:
-            Dictionary mapping feature names to importance scores
+            Dictionary mapping feature indices to importance scores
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet")

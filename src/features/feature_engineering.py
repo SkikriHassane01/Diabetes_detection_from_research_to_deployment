@@ -1,146 +1,163 @@
 import pandas as pd
-import numpy as np
-from typing import Optional, Dict, List
-from sklearn.base import BaseEstimator, TransformerMixin
+import numpy as np 
+from typing import Dict, Optional
 from src.utils.logging_config import setup_logger
 
 logger = setup_logger('feature_engineering')
 
-class FeatureEngineer(BaseEstimator, TransformerMixin):
+class FeatureEngineer:
     """
-    Handles feature engineering for the diabetes classification project.
-    Inherits from sklearn's BaseEstimator and TransformerMixin for pipeline compatibility.
+    Handles feature engineering for diabetes prediction dataset.
+    Creates new features based on medical domain knowledge.
     """
+    
     def __init__(self, config: Optional[Dict] = None):
+        """
+        Initialize feature engineering configuration.
+        
+        Args:
+            config: Optional configuration dictionary
+        """
         self.config = config or {
-            'age_ranges': {
-                1: '18-24', 2: '25-29', 3: '30-34', 4: '35-39',
-                5: '40-44', 6: '45-49', 7: '50-54', 8: '55-59',
-                9: '60-64', 10: '65-69', 11: '70-74', 12: '75-79',
-                13: '80+'
+            'age_risk_threshold': 40.0,  # Age above which diabetes risk increases
+            'bmi_categories': {
+                'Underweight': 18.5,
+                'Normal': 24.9,
+                'Overweight': 29.9,
+                'Obese': float('inf')
             },
-            'health_features': ['GenHlth', 'MentHlth', 'PhysHlth'],
-            'risk_factors': ['HighBP', 'HighChol', 'HeartDiseaseorAttack'],
-            'lifestyle_features': ['PhysActivity', 'Fruits', 'Veggies', 'HvyAlcoholConsump', 'Smoker'],
+            'glucose_risk_threshold': 140.0,  # High blood glucose threshold
+            'HbA1c_risk_threshold': 5.7,  # Pre-diabetes threshold
         }
         logger.info("FeatureEngineer initialized with configuration")
 
-    def fit(self, X: pd.DataFrame, y=None):
-        return self
-
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Apply all feature engineering transformations.
+        Apply feature engineering transformations.
         
         Args:
-            X: Input DataFrame
+            data: Input DataFrame
             
         Returns:
             DataFrame with engineered features
         """
         logger.info("Starting feature engineering transformation")
-        df = X.copy()
         
-        # Create basic composite features
-        df = self._create_health_score(df)
-        df = self._create_risk_score(df)
+        # Create copy to avoid modifying original data
+        df = data.copy()
+        
+        # Create features
+        df = self._create_bmi_features(df)
+        df = self._create_age_related_features(df)
+        df = self._create_medical_risk_score(df)
+        df = self._create_metabolic_score(df)
         df = self._create_lifestyle_score(df)
-        
-        # Create interaction features
-        df = self._create_age_bmi_interaction(df)
-        df = self._create_health_risk_interaction(df)
-        
-        df = self._create_healthcare_access_index(df)
+        df = self._create_interaction_features(df)
         
         logger.info(f"Feature engineering completed. New shape: {df.shape}")
         return df
-
-    def _create_health_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create composite health score from health-related features"""
-        try:
-            # Normalize each component to 0-1 scale
-            df['HealthScore'] = (
-                # GenHlth is 1-5 where 1 is excellent, so we invert it
-                (5 - df['GenHlth']) / 4 +
-                # MentHlth and PhysHlth are days of poor health (0-30)
-                (30 - df['MentHlth']) / 30 +
-                (30 - df['PhysHlth']) / 30
-            ) / 3  # Average the components
-            
-            logger.info("Created HealthScore feature")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating health score: {str(e)}")
-            raise
-
-    def _create_risk_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create composite risk score from risk factors"""
-        try:
-            # Weight different risk factors
-            df['RiskScore'] = (
-                df['HighBP'] * 2.0 +  # Higher weight for blood pressure
-                df['HighChol'] * 1.5 +  # Medium weight for cholesterol
-                df['HeartDiseaseorAttack'] * 1.5 +  # Medium weight for heart conditions
-                (df['BMI'] > 30).astype(int) * 1.5 +  # Medium weight for obesity
-                (df['Age'] >= 7).astype(int) * 1.5  # Medium weight for age > 50
-            ) / 8.0  # Normalize to 0-1 scale
-            
-            logger.info("Created RiskScore feature")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating risk score: {str(e)}")
-            raise
-
+        
+    def _create_bmi_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create BMI-related features."""
+        # BMI Category
+        df['bmi_category'] = pd.cut(
+            df['bmi'],
+            bins=[-np.inf] + list(self.config['bmi_categories'].values()),
+            labels=list(self.config['bmi_categories'].keys())
+        )
+        
+        # Convert to numeric for modeling
+        df['bmi_category'] = pd.factorize(df['bmi_category'])[0]
+        
+        logger.info("Created BMI category features")
+        return df
+        
+    def _create_age_related_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create age-related features."""
+        # Age risk factor (increases after threshold)
+        df['age_risk'] = (df['age'] > self.config['age_risk_threshold']).astype(int)
+        
+        # Age-BMI interaction
+        df['age_bmi_interaction'] = df['age'] * df['bmi'] / 100.0
+        
+        logger.info("Created age-related features")
+        return df
+        
+    def _create_medical_risk_score(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create composite medical risk score."""
+        df['medical_risk_score'] = (
+            df['hypertension'] * 2.0 +  # High impact
+            df['heart_disease'] * 2.0 +  # High impact
+            df['age_risk'] * 1.5 +      # Medium impact
+            (df['bmi_category'] >= 2).astype(int)  # Impact of overweight/obese
+        ) / 6.5  # Normalize to 0-1 range
+        
+        logger.info("Created medical risk score")
+        return df
+        
+    def _create_metabolic_score(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create metabolic health score."""
+        # High glucose risk
+        glucose_risk = (df['blood_glucose_level'] > self.config['glucose_risk_threshold']).astype(float)
+        
+        # High HbA1c risk
+        hba1c_risk = (df['HbA1c_level'] > self.config['HbA1c_risk_threshold']).astype(float)
+        
+        # Combined metabolic score
+        df['metabolic_score'] = (
+            glucose_risk * 2.0 +  # High impact
+            hba1c_risk * 2.0 +   # High impact
+            (df['bmi_category'] >= 2).astype(float)  # Impact of overweight/obese
+        ) / 5.0  # Normalize to 0-1 range
+        
+        logger.info("Created metabolic score")
+        return df
+        
     def _create_lifestyle_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create composite lifestyle score from lifestyle-related features"""
-        try:
-            # Positive factors add to score, negative factors subtract
-            df['LifestyleScore'] = (
-                df['PhysActivity'] * 1.0 +  # Physical activity is positive
-                df['Fruits'] * 0.5 +        # Healthy diet is positive
-                df['Veggies'] * 0.5 -       
-                df['HvyAlcoholConsump'] * 1.0 -  # Heavy alcohol consumption is negative
-                df['Smoker'] * 1.0          # Smoking is negative
-            ) / 3.0  # Normalize to roughly -1 to 1 scale
-            
-            logger.info("Created LifestyleScore feature")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating lifestyle score: {str(e)}")
-            raise
-
-    def _create_age_bmi_interaction(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create interaction between age and BMI"""
-        try:
-            # Normalize BMI by its mean to keep the scale reasonable
-            df['AgeBMI'] = df['Age'] * df['BMI'] / df['BMI'].mean()
-            logger.info("Created Age-BMI interaction feature")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating age-BMI interaction: {str(e)}")
-            raise
-
-    def _create_health_risk_interaction(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create interaction between health score and risk factors"""
-        try:
-            if 'HealthScore' in df.columns and 'RiskScore' in df.columns:
-                df['HealthRiskInteraction'] = df['HealthScore'] * df['RiskScore']
-                logger.info("Created Health-Risk interaction feature")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating health-risk interaction: {str(e)}")
-            raise
-
-    def _create_healthcare_access_index(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create healthcare access index"""
-        try:
-            df['HealthcareAccessIndex'] = (
-                df['AnyHealthcare'] * 2.0 -  # Having healthcare is strongly positive
-                df['NoDocbcCost'] * 1.5    # Cost barriers are negative
-            ) / 3.5  # Normalize to roughly -1 to 1 scale
-            
-            logger.info("Created healthcare access index")
-            return df
-        except Exception as e:
-            logger.error(f"Error creating healthcare access index: {str(e)}")
-            raise
+        """Create lifestyle risk score based on smoking history and BMI."""
+        # Encode smoking history risk
+        smoking_risk = pd.get_dummies(df['smoking_history'], prefix='smoking')
+        
+        # Higher risk for current and former smokers
+        risk_weights = {
+            'smoking_current': 1.0,
+            'smoking_former': 0.7,
+            'smoking_ever': 0.7,
+            'smoking_not current': 0.5,
+            'smoking_never': 0.0,
+            'smoking_No Info': 0.5
+        }
+        
+        # Calculate weighted smoking risk
+        df['smoking_risk'] = 0
+        for col, weight in risk_weights.items():
+            if col in smoking_risk.columns:
+                df['smoking_risk'] += smoking_risk[col] * weight
+        
+        # Combine with BMI risk for overall lifestyle score
+        df['lifestyle_score'] = (
+            df['smoking_risk'] * 0.6 +  # Smoking impact
+            (df['bmi_category'] >= 2).astype(float) * 0.4  # BMI impact
+        )
+        
+        logger.info("Created lifestyle score")
+        return df
+        
+    def _create_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create interaction features between important variables."""
+        # Age-medical interactions
+        df['age_hypertension'] = df['age'] * df['hypertension']
+        df['age_heart_disease'] = df['age'] * df['heart_disease']
+        
+        # Medical condition interactions
+        df['cardio_metabolic_risk'] = df['hypertension'] * df['heart_disease'] * df['metabolic_score']
+        
+        # Risk score interactions
+        df['combined_risk_score'] = (
+            df['medical_risk_score'] * 0.4 +
+            df['metabolic_score'] * 0.4 +
+            df['lifestyle_score'] * 0.2
+        )
+        
+        logger.info("Created interaction features")
+        return df

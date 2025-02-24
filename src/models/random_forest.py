@@ -5,7 +5,7 @@ from src.models.base_model import BaseModel
 
 class RandomForestModel(BaseModel):
     """
-    Random Forest implementation for diabetes classification.
+    Random Forest implementation for diabetes binary classification.
     """
     def __init__(self, model_params: Optional[Dict[str, Any]] = None):
         """
@@ -15,18 +15,17 @@ class RandomForestModel(BaseModel):
             model_params: Dictionary of model parameters
         """
         default_params = {
-            'n_estimators': 100,
-            'max_depth': 10,
-            'min_samples_split': 20,
-            'min_samples_leaf': 10,
+            'n_estimators': 200,
+            'max_depth': 15,
+            'min_samples_split': 4,
+            'min_samples_leaf': 1,
             'max_features': 'sqrt',
             'class_weight': 'balanced',
             'random_state': 42,
             'n_jobs': -1,
-            'oob_score': True
+            'verbose': 0
         }
         
-        # Update default parameters with provided parameters
         if model_params:
             default_params.update(model_params)
             
@@ -37,26 +36,13 @@ class RandomForestModel(BaseModel):
         self.model = RandomForestClassifier(**self.model_params)
     
     def train(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
-        """
-        Train the Random Forest model.
-        
-        Args:
-            X_train: Training features
-            y_train: Training labels
-        """
+        """Train the Random Forest model."""
         if self.model is None:
             self.build()
-        
         self.model.fit(X_train, y_train)
         
     def get_feature_importance(self) -> Dict[str, float]:
-        """
-        Get feature importance scores.
-        
-        Returns:
-            Dictionary mapping feature names to importance scores
-        """
+        """Get feature importance scores."""
         if self.model is None:
             raise ValueError("Model has not been trained yet")
-        
-        return self.model.feature_importances_
+        return dict(enumerate(self.model.feature_importances_))

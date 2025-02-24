@@ -5,7 +5,7 @@ from src.models.base_model import BaseModel
 
 class LogisticRegressionModel(BaseModel):
     """
-    Logistic Regression implementation for diabetes classification.
+    Logistic Regression implementation for diabetes binary classification.
     """
     def __init__(self, model_params: Optional[Dict[str, Any]] = None):
         """
@@ -20,7 +20,7 @@ class LogisticRegressionModel(BaseModel):
             'class_weight': 'balanced',
             'random_state': 42,
             'max_iter': 1000,
-            'multi_class': 'multinomial',
+            'solver': 'lbfgs',
             'n_jobs': -1
         }
         
@@ -34,14 +34,13 @@ class LogisticRegressionModel(BaseModel):
         self.model = LogisticRegression(**self.model_params)
     
     def train(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
-        """
-        Train the Logistic Regression model.
-        
-        Args:
-            X_train: Training features
-            y_train: Training labels
-        """
+        """Train the Logistic Regression model."""
         if self.model is None:
             self.build()
-        
         self.model.fit(X_train, y_train)
+        
+    def get_feature_importance(self) -> Dict[str, float]:
+        """Get feature importance based on coefficients."""
+        if self.model is None:
+            raise ValueError("Model has not been trained yet")
+        return dict(enumerate(abs(self.model.coef_[0])))

@@ -15,9 +15,9 @@ REPORT_DIST_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(__name__)), 
 
 def analyze_class_imbalance(data: pd.DataFrame, 
                            output_dir: str = REPORT_DIST_DIR,
-                           target_column: str = 'Diabetes_012',
+                           target_column: str = 'diabetes',
                            class_names: Dict = None,
-                           figsize: Tuple[int, int] = (10, 6)) -> Dict:
+                           figsize: Tuple[int, int] = (10, 6)):
     """
     Analyze and visualize class imbalance in the target variable.
     
@@ -36,24 +36,24 @@ def analyze_class_imbalance(data: pd.DataFrame,
     
     # Default class names if not provided
     if class_names is None:
-        class_names = {0: 'No Diabetes', 1: 'Prediabetes', 2: 'Diabetes'}
+        class_names = {0: 'No Diabetes', 1: 'Diabetes'}
     
     # Get target distribution
     class_counts = data[target_column].value_counts().sort_index()
-    
     total_samples = len(data)
     class_proportions = class_counts / total_samples 
+    
+    # Calculate imbalance ratio
+    imbalance_ratio = class_counts.max() / class_counts.min()
     
     # Create bar chart with counts and percentages
     plt.figure(figsize=figsize)
     ax = sns.barplot(x=class_counts.index,
                      y=class_counts.values,
-                     palette=['green', 'orange', 'red'])
+                     palette=['lightblue', 'salmon'])
     
     ax.spines['top'].set_visible(False)
-    ax.spines['left'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_yticks([])  # Remove y-axis ticks
     
     # Set class names as labels
     if hasattr(ax, 'set_xticklabels'):
@@ -61,24 +61,27 @@ def analyze_class_imbalance(data: pd.DataFrame,
     
     # Add percentage and count annotations
     for i, (count, proportion) in enumerate(zip(class_counts, class_proportions)):
-        plt.annotate(f'{count}\n({proportion:.1%})', 
+        plt.annotate(f'{count:,}\n({proportion:.1%})', 
                    xy=(i, count), 
                    xytext=(0, 5),  # Offset from point
                    textcoords='offset points',
                    ha='center', 
-                   va='bottom')
+                   va='bottom',
+                   fontsize=11)
     
-    plt.title(f'Class Distribution for {target_column}')
+    plt.title('Class Distribution in Target Variable')
     plt.xlabel('Class')
     plt.ylabel('Count')
     
     try:
         plt.savefig(os.path.join(output_dir, 'class_distribution.png'), dpi=300)
-        logger.info(f'the Class Distribution Bar is saved in {output_dir}')
+        logger.info(f'The Class Distribution plot is saved in {output_dir}')
         plt.close()
     except Exception as e:
-        logger.error(f"Failed to save Class Distribution Bar in {output_dir} ==> see the error {e}")
+        logger.error(f"Failed to save Class Distribution plot in {output_dir} ==> see the error {e}")
+    
         
-# if __name__ == "__main__":
-#     data = pd.read_csv("data/extracted/diabetes_data/diabetes_012_health_indicators_BRFSS2015.csv")
-#     analyze_class_imbalance(data)
+if __name__ == "__main__":
+    data_path = 'data/extracted/diabetes_prediction_dataset/diabetes_prediction_dataset.csv'
+    data = pd.read_csv(data_path)
+    analyze_class_imbalance(data)

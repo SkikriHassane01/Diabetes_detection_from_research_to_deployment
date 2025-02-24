@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
 from pathlib import Path
-from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, LabelEncoder, OneHotEncoder
 from sklearn.model_selection import train_test_split
 from src.utils.logging_config import setup_logger
 
@@ -23,48 +23,62 @@ class DataProcessor:
         """
         # Default configuration
         self.config = config or {
-            'health_features': ['MentHlth', 'PhysHlth'],  # Features for outlier treatment and standard scaling
-            'bmi_feature': 'BMI',  # Feature for robust scaling
-            'target_column': 'Diabetes_012',
-            'outlier_threshold': 3.0,  # Z-score threshold for outlier detection
-            'test_size': 0.2,
-            'random_state': 42
+            'continuous_features': ['age', 'bmi', 'HbA1c_level', 'blood_glucose_level'],
+            'categorical_features': ['gender', 'smoking_history'],
+            'binary_features': ['hypertension', 'heart_disease'],
+            'target_column': 'diabetes',
+            'categorical_encoding' : 'label',  # Encoding strategy for categorical features
+            'outlier_threshold': 3.0  # Z-score threshold for outlier detection
         }
         self.standard_scaler = StandardScaler()
         self.robust_scaler = RobustScaler()
+        self.label_encoders = {}
+        self.onehot_encoder = OneHotEncoder(handle_unknown='ignore')
+        self.encoded_feature_names = []
         logger.info("DataProcessor initialized with configuration")
         
     def handle_missing_values(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Handle missing values in the dataset."""
+        """
+        Handle missing values in the dataset.
+        """
         df = data.copy()
+        
+        # Check for missing values
         missing_count = df.isnull().sum()
         total_missing = missing_count.sum()
         
         if total_missing > 0:
             logger.info(f"Found {total_missing} missing values across {sum(missing_count > 0)} features")
             
-            # For health features and BMI - impute with median
-            health_features = self.config['health_features'] + [self.config['bmi_feature']]
-            for feature in health_features:
+            # Handle continuous features - impute with median
+            for feature in self.config['continuous_features']:
                 if feature in df.columns and df[feature].isnull().sum() > 0:
                     median_value = df[feature].median()
                     df[feature].fillna(median_value, inplace=True)
                     logger.info(f"Imputed {feature} missing values with median: {median_value}")
             
-            # For all other columns - impute with mode
-            other_columns = [col for col in df.columns if col not in health_features]
-            for column in other_columns:
-                if df[column].isnull().sum() > 0:
-                    mode_value = df[column].mode()[0]
-                    df[column].fillna(mode_value, inplace=True)
-                    logger.info(f"Imputed {column} missing values with mode: {mode_value}")
+            # Handle categorical features - impute with mode
+            for feature in self.config['categorical_features']:
+                if feature in df.columns and df[feature].isnull().sum() > 0:
+                    mode_value = df[feature].mode()[0]
+                    df[feature].fillna(mode_value, inplace=True)
+                    logger.info(f"Imputed {feature} missing values with mode: {mode_value}")
+                    
+            # Handle binary features - impute with mode
+            for feature in self.config['binary_features']:
+                if feature in df.columns and df[feature].isnull().sum() > 0:
+                    mode_value = df[feature].mode()[0]
+                    df[feature].fillna(mode_value, inplace=True)
+                    logger.info(f"Imputed {feature} missing values with mode: {mode_value}")
         else:
             logger.info("No missing values found in the dataset")
             
         return df
     
     def handle_duplicates(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Remove duplicate rows from the dataset."""
+        """
+        Identify and remove duplicate rows from the dataset.
+        """
         n_duplicates = data.duplicated().sum()
         
         if n_duplicates > 0:
@@ -77,91 +91,185 @@ class DataProcessor:
             return data
     
     def handle_outliers(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Handle outliers in health features using IQR method."""
+        """
+        Detect and handle outliers in continuous features.
+        """
         df = data.copy()
         
-        for feature in self.config['health_features']:
-            if feature not in df.columns:
-                continue
-                
+        for feature in self.config['continuous_features']:
+            # Calculate z-scores
             z_scores = np.abs((df[feature] - df[feature].mean()) / df[feature].std())
+            
+            # Identify outliers
             outlier_indices = z_scores > self.config['outlier_threshold']
             n_outliers = outlier_indices.sum()
             
             if n_outliers > 0:
                 logger.info(f"Found {n_outliers} outliers in {feature}")
                 
+                # Cap outliers at threshold values (winsorization)
                 q1 = df[feature].quantile(0.25)
                 q3 = df[feature].quantile(0.75)
                 iqr = q3 - q1
                 lower_bound = q1 - 1.5 * iqr
                 upper_bound = q3 + 1.5 * iqr
                 
+                # Apply capping
                 df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
                 logger.info(f"Capped outliers in {feature} to range: [{lower_bound:.2f}, {upper_bound:.2f}]")
         
         return df
     
-    def split_and_scale_features(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    def scale_features(self, data: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
         """
-        Split data and scale features using different scalers:
-        - RobustScaler for BMI
-        - StandardScaler for MentHlth and PhysHlth
+        Scale features using appropriate scalers:
+        - RobustScaler for age, blood_glucose_level (more robust to outliers)
+        - StandardScaler for bmi, HbA1c_level
+        """
+        df = data.copy()
         
-        Returns:
-            Tuple of (X_train_scaled, X_test_scaled, y_train, y_test)
-        """
         try:
-            # Split data first
-            X = data.drop(columns=[self.config['target_column']])
-            y = data[self.config['target_column']]
+            # Scale with RobustScaler
+            robust_features = ['age', 'blood_glucose_level']
+            robust_features = [f for f in robust_features if f in df.columns]
+            if robust_features:
+                if fit:
+                    df[robust_features] = self.robust_scaler.fit_transform(df[robust_features])
+                else:
+                    df[robust_features] = self.robust_scaler.transform(df[robust_features])
+                logger.info(f"Applied RobustScaler to {robust_features}")
             
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y,
-                test_size= 0.2,
-                random_state=42,
-                stratify=y
-            )
-            
-            # Scale BMI using RobustScaler
-            if self.config['bmi_feature'] in X_train.columns:
-                bmi_train = X_train[self.config['bmi_feature']].values.reshape(-1, 1)
-                bmi_test = X_test[self.config['bmi_feature']].values.reshape(-1, 1)
+            # Scale with StandardScaler
+            standard_features = ['bmi', 'HbA1c_level']
+            standard_features = [f for f in standard_features if f in df.columns]
+            if standard_features:
+                if fit:
+                    df[standard_features] = self.standard_scaler.fit_transform(df[standard_features])
+                else:
+                    df[standard_features] = self.standard_scaler.transform(df[standard_features])
+                logger.info(f"Applied StandardScaler to {standard_features}")
                 
-                X_train[self.config['bmi_feature']] = self.robust_scaler.fit_transform(bmi_train)
-                X_test[self.config['bmi_feature']] = self.robust_scaler.transform(bmi_test)
-                logger.info(f"Applied RobustScaler to {self.config['bmi_feature']}")
-            
-            # Scale health features using StandardScaler
-            health_features = [f for f in self.config['health_features'] if f in X_train.columns]
-            if health_features:
-                X_train[health_features] = self.standard_scaler.fit_transform(X_train[health_features])
-                X_test[health_features] = self.standard_scaler.transform(X_test[health_features])
-                logger.info(f"Applied StandardScaler to health features: {health_features}")
-            
-            return X_train, X_test, y_train, y_test
-            
         except Exception as e:
             logger.error(f"Error during feature scaling: {str(e)}")
             raise
-    
-    def process_data(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+            
+        return df
+
+    def encode_categorical_features(self, data: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
         """
-        Execute the full data processing pipeline.
+        Encode categorical features using specified strategy.
         
+        Args:
+            data: Input DataFrame
+            fit: Whether to fit encoders (True for training, False for test)
+            
         Returns:
-            Tuple of (X_train_scaled, X_test_scaled, y_train, y_test)
+            DataFrame with encoded categorical features
+        """
+        df = data.copy()
+        
+        # Get categorical features present in the data
+        cat_features = [f for f in self.config['categorical_features'] if f in df.columns]
+        
+        if not cat_features:
+            return df
+            
+        try:
+            if self.config['categorical_encoding'] == 'label':
+                # Label encoding
+                for feature in cat_features:
+                    if fit:
+                        # Initialize and fit encoder if not exists
+                        if feature not in self.label_encoders:
+                            self.label_encoders[feature] = LabelEncoder()
+                        # Fit the encoder
+                        self.label_encoders[feature].fit(df[feature].astype(str))
+                    
+                    # Transform the data
+                    df[feature] = self.label_encoders[feature].transform(df[feature].astype(str))
+                    logger.info(f"Applied label encoding to {feature}")
+                    
+            elif self.config['categorical_encoding'] == 'onehot':
+                # Get categorical data
+                categorical_data = df[cat_features]
+                
+                if fit:
+                    # Fit and transform
+                    encoded_array = self.onehot_encoder.fit_transform(categorical_data)
+                    
+                    # Generate feature names
+                    self.encoded_feature_names = []
+                    for i, feature in enumerate(cat_features):
+                        feature_vals = self.onehot_encoder.categories_[i]
+                        self.encoded_feature_names.extend([f"{feature}_{val}" for val in feature_vals])
+                else:
+                    # Transform only
+                    encoded_array = self.onehot_encoder.transform(categorical_data)
+                
+                # Create DataFrame with encoded data
+                encoded_df = pd.DataFrame(
+                    encoded_array,
+                    columns=self.encoded_feature_names,
+                    index=df.index
+                )
+                
+                # Drop original categorical columns and join encoded ones
+                df = df.drop(columns=cat_features)
+                df = pd.concat([df, encoded_df], axis=1)
+                logger.info(f"Applied one-hot encoding to {cat_features}")
+                
+            else:
+                raise ValueError(f"Unsupported encoding strategy: {self.config['categorical_encoding']}")
+                
+        except Exception as e:
+            logger.error(f"Error during categorical encoding: {str(e)}")
+            raise
+            
+        return df
+
+    def process_data(self, data: pd.DataFrame, test_size: float = 0.2) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+        """
+        Execute the full data processing pipeline with consistent shapes.
+        
+        Args:
+            data: Input DataFrame
+            test_size: Proportion of data for test set
+            
+        Returns:
+            X_train, X_test, y_train, y_test
         """
         logger.info(f"Starting data processing on data with shape: {data.shape}")
         
-        # Apply preprocessing steps
-        data = self.handle_missing_values(data)
-        data = self.handle_duplicates(data)
-        data = self.handle_outliers(data)
+        df = data.copy()
         
-        # Split and scale the data
-        X_train, X_test, y_train, y_test = self.split_and_scale_features(data)
+        df = self.handle_missing_values(df)
+        df = self.handle_duplicates(df)
         
-        logger.info(f"Completed data processing. Training set shape: {X_train.shape}, Test set shape: {X_test.shape}")
+        # Extract target 
+        y = df[self.config['target_column']]
+        X = df.drop(columns=[self.config['target_column']])
+        
+        # Split the cleaned data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=42, stratify=y
+        )
+        
+        # Process training data
+        X_train = self.handle_outliers(X_train)
+        X_train = self.encode_categorical_features(X_train, fit=True)
+        X_train = self.scale_features(X_train, fit=True)
+        
+        # Process test data
+        X_test = self.handle_outliers(X_test)
+        X_test = self.encode_categorical_features(X_test, fit=False)
+        X_test = self.scale_features(X_test, fit=False)
+        
+        # Verify shapes match
+        assert len(X_train) == len(y_train), "Training data and labels must have same length"
+        assert len(X_test) == len(y_test), "Test data and labels must have same length"
+        
+        logger.info(f"Completed data processing.")
+        logger.info(f"Training shapes - X: {X_train.shape}, y: {y_train.shape}")
+        logger.info(f"Test shapes - X: {X_test.shape}, y: {y_test.shape}")
         
         return X_train, X_test, y_train, y_test

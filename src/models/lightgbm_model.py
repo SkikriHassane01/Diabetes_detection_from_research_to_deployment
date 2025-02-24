@@ -5,7 +5,7 @@ from src.models.base_model import BaseModel
 
 class LightGBMModel(BaseModel):
     """
-    LightGBM implementation for diabetes classification.
+    LightGBM implementation for diabetes binary classification.
     """
     def __init__(self, model_params: Optional[Dict[str, Any]] = None):
         """
@@ -15,22 +15,22 @@ class LightGBMModel(BaseModel):
             model_params: Dictionary of model parameters
         """
         default_params = {
-                'n_estimators': 100,
-                'max_depth': 6,
-                'learning_rate': 0.01,
-                'num_leaves': 20,
-                'min_child_samples': 20,
-                'subsample': 0.8,
-                'colsample_bytree': 0.8,
-                'reg_alpha': 0.1,
-                'reg_lambda': 1.0,
-                'objective': 'multiclass',
-                'num_class': 3,
-                'random_state': 42,
-                'n_jobs': -1
+            'objective': 'xentropy', # binary # give more importance to the positive class
+            'metric': 'recall', #binary_logloss
+            'is_unbalance' : True,
+            'scale_pos_weight': 2, # increase the weight of the positive class (diabetes)
+            'boosting_type': 'gbdt',
+            'learning_rate': 0.5,
+            'num_leaves': 50,
+            'max_depth': 10,
+            'min_child_samples': 10,
+            'subsample': 0.8,
+            'colsample_bytree': 0.8,
+            'random_state': 42,
+            'n_jobs': -1,
+            'verbose': -1
         }
         
-        # Update default parameters with provided parameters
         if model_params:
             default_params.update(model_params)
             
@@ -41,20 +41,14 @@ class LightGBMModel(BaseModel):
         self.model = lgb.LGBMClassifier(**self.model_params)
     
     def train(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
-        """
-        Train the LightGBM model.
-        
-        Args:
-            X_train: Training features
-            y_train: Training labels
-        """
+        """Train the LightGBM model."""
         if self.model is None:
             self.build()
         
         self.model.fit(
             X_train, 
             y_train,
-            eval_metric='multi_logloss'
+            eval_metric='binary_logloss'
         )
         
     def get_feature_importance(self, importance_type: str = 'gain') -> Dict[str, float]:
@@ -63,9 +57,6 @@ class LightGBMModel(BaseModel):
         
         Args:
             importance_type: Type of feature importance ('split', 'gain')
-            
-        Returns:
-            Dictionary mapping feature names to importance scores
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet")

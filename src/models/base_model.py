@@ -9,7 +9,7 @@ logger = setup_logger('models')
 
 class BaseModel(ABC):
     """
-    Abstract base class for all models in the diabetes classification project.
+    Abstract base class for all models in the diabetes binary classification project.
     Enforces consistent interface across different model implementations.
     """
     def __init__(self, model_name: str, model_params: Optional[Dict[str, Any]] = None):
@@ -27,10 +27,7 @@ class BaseModel(ABC):
         
     @abstractmethod
     def build(self) -> None:
-        """
-        Build the model with specified parameters.
-        Must be implemented by concrete model classes.
-        """
+        """Build the model with specified parameters."""
         pass
     
     @abstractmethod
@@ -52,7 +49,7 @@ class BaseModel(ABC):
             X: Features to predict on
             
         Returns:
-            Array of predictions
+            Array of binary predictions (0 or 1)
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet")
@@ -60,21 +57,21 @@ class BaseModel(ABC):
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """
-        Get probability predictions for each class.
+        Get probability predictions.
         
         Args:
             X: Features to predict on
             
         Returns:
-            Array of class probabilities
+            Array of probabilities for class 1 (diabetes)
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet")
-        return self.model.predict_proba(X)
+        return self.model.predict_proba(X)[:, 1]
     
     def save(self, path: str) -> None:
         """
-        Save model to disk.
+        Save model to disk using MLflow.
         
         Args:
             path: Path to save model
@@ -91,7 +88,7 @@ class BaseModel(ABC):
     
     def load(self, path: str) -> None:
         """
-        Load model from disk.
+        Load model from disk using MLflow.
         
         Args:
             path: Path to load model from
@@ -104,21 +101,11 @@ class BaseModel(ABC):
             raise
     
     def get_params(self) -> Dict[str, Any]:
-        """
-        Get model parameters.
-        
-        Returns:
-            Dictionary of model parameters
-        """
+        """Get model parameters."""
         return self.model_params
     
     def set_params(self, **params: Any) -> None:
-        """
-        Set model parameters.
-        
-        Args:
-            **params: Parameters to set
-        """
+        """Set model parameters."""
         self.model_params.update(params)
         if self.model is not None:
             self.model.set_params(**params)
