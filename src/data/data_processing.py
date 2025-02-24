@@ -4,6 +4,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.model_selection import train_test_split
 from src.utils.logging_config import setup_logger
 
 logger = setup_logger('data_processing')
@@ -25,26 +26,17 @@ class DataProcessor:
             'health_features': ['MentHlth', 'PhysHlth'],  # Features for outlier treatment and standard scaling
             'bmi_feature': 'BMI',  # Feature for robust scaling
             'target_column': 'Diabetes_012',
-            'outlier_threshold': 3.0  # Z-score threshold for outlier detection
+            'outlier_threshold': 3.0,  # Z-score threshold for outlier detection
+            'test_size': 0.2,
+            'random_state': 42
         }
         self.standard_scaler = StandardScaler()
         self.robust_scaler = RobustScaler()
         logger.info("DataProcessor initialized with configuration")
         
     def handle_missing_values(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Handle missing values in the dataset.
-        
-        Args:
-            data: DataFrame containing potentially missing values
-            
-        Returns:
-            DataFrame with missing values handled
-        """
-        # Create a copy to avoid modifying the original DataFrame
+        """Handle missing values in the dataset."""
         df = data.copy()
-        
-        # Check for missing values
         missing_count = df.isnull().sum()
         total_missing = missing_count.sum()
         
@@ -72,22 +64,11 @@ class DataProcessor:
         return df
     
     def handle_duplicates(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Identify and remove duplicate rows from the dataset.
-        
-        Args:
-            data: DataFrame potentially containing duplicates
-            
-        Returns:
-            DataFrame with duplicates removed
-        """
-        # Check for duplicates
+        """Remove duplicate rows from the dataset."""
         n_duplicates = data.duplicated().sum()
         
         if n_duplicates > 0:
             logger.info(f"Found {n_duplicates} duplicate rows ({n_duplicates/len(data):.2%} of the dataset)")
-            
-            # Remove duplicates and reset index
             data_deduped = data.drop_duplicates().reset_index(drop=True)
             logger.info(f"Removed {n_duplicates} duplicate rows, new shape: {data_deduped.shape}")
             return data_deduped
@@ -96,114 +77,91 @@ class DataProcessor:
             return data
     
     def handle_outliers(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Detect and handle outliers only in health features (MentHlth and PhysHlth).
-        
-        Args:
-            data: DataFrame potentially containing outliers
-            
-        Returns:
-            DataFrame with outliers handled
-        """
-        # Create a copy to avoid modifying the original DataFrame
+        """Handle outliers in health features using IQR method."""
         df = data.copy()
         
-        # Only handle outliers in health features
         for feature in self.config['health_features']:
             if feature not in df.columns:
                 continue
                 
-            # Calculate z-scores for the feature
             z_scores = np.abs((df[feature] - df[feature].mean()) / df[feature].std())
-            
-            # Identify outliers
             outlier_indices = z_scores > self.config['outlier_threshold']
             n_outliers = outlier_indices.sum()
             
             if n_outliers > 0:
                 logger.info(f"Found {n_outliers} outliers in {feature}")
                 
-                # Cap outliers at threshold values (winsorization)
                 q1 = df[feature].quantile(0.25)
                 q3 = df[feature].quantile(0.75)
                 iqr = q3 - q1
                 lower_bound = q1 - 1.5 * iqr
                 upper_bound = q3 + 1.5 * iqr
                 
-                # Apply capping
                 df[feature] = df[feature].clip(lower=lower_bound, upper=upper_bound)
                 logger.info(f"Capped outliers in {feature} to range: [{lower_bound:.2f}, {upper_bound:.2f}]")
         
         return df
     
-    def scale_features(self, data: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
+    def split_and_scale_features(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """
-        Scale features using different scalers:
+        Split data and scale features using different scalers:
         - RobustScaler for BMI
         - StandardScaler for MentHlth and PhysHlth
         
-        Args:
-            data: DataFrame containing features to scale
-            fit: Whether to fit new scalers (True) or use existing ones (False)
-            
         Returns:
-            DataFrame with scaled features
+            Tuple of (X_train_scaled, X_test_scaled, y_train, y_test)
         """
-        # Create a copy to avoid modifying the original DataFrame
-        df = data.copy()
-        
         try:
+            # Split data first
+            X = data.drop(columns=[self.config['target_column']])
+            y = data[self.config['target_column']]
+            
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y,
+                test_size= 0.2,
+                random_state=42,
+                stratify=y
+            )
+            
             # Scale BMI using RobustScaler
-            if self.config['bmi_feature'] in df.columns:
-                bmi_values = df[self.config['bmi_feature']].values.reshape(-1, 1)
-                if fit:
-                    df[self.config['bmi_feature']] = self.robust_scaler.fit_transform(bmi_values)
-                else:
-                    df[self.config['bmi_feature']] = self.robust_scaler.transform(bmi_values)
+            if self.config['bmi_feature'] in X_train.columns:
+                bmi_train = X_train[self.config['bmi_feature']].values.reshape(-1, 1)
+                bmi_test = X_test[self.config['bmi_feature']].values.reshape(-1, 1)
+                
+                X_train[self.config['bmi_feature']] = self.robust_scaler.fit_transform(bmi_train)
+                X_test[self.config['bmi_feature']] = self.robust_scaler.transform(bmi_test)
                 logger.info(f"Applied RobustScaler to {self.config['bmi_feature']}")
             
             # Scale health features using StandardScaler
-            health_features = [f for f in self.config['health_features'] if f in df.columns]
+            health_features = [f for f in self.config['health_features'] if f in X_train.columns]
             if health_features:
-                health_values = df[health_features].values
-                if fit:
-                    df[health_features] = self.standard_scaler.fit_transform(health_values)
-                else:
-                    df[health_features] = self.standard_scaler.transform(health_values)
+                X_train[health_features] = self.standard_scaler.fit_transform(X_train[health_features])
+                X_test[health_features] = self.standard_scaler.transform(X_test[health_features])
                 logger.info(f"Applied StandardScaler to health features: {health_features}")
-                
+            
+            return X_train, X_test, y_train, y_test
+            
         except Exception as e:
             logger.error(f"Error during feature scaling: {str(e)}")
             raise
-            
-        return df
     
-    def process_data(self, data: pd.DataFrame, fit_scalers: bool = True) -> pd.DataFrame:
+    def process_data(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """
         Execute the full data processing pipeline.
         
-        Args:
-            data: Raw DataFrame to process
-            fit_scalers: Whether to fit new scalers or use existing ones
-            
         Returns:
-            Processed DataFrame ready for model training
+            Tuple of (X_train_scaled, X_test_scaled, y_train, y_test)
         """
         logger.info(f"Starting data processing on data with shape: {data.shape}")
         
-        # Apply processing steps in sequence
+        # Apply preprocessing steps
         data = self.handle_missing_values(data)
         data = self.handle_duplicates(data)
         data = self.handle_outliers(data)
-        data = self.scale_features(data, fit=fit_scalers)
         
-        # Check for duplicates created during processing
-        final_duplicates = data.duplicated().sum()
-        if final_duplicates > 0:
-            logger.warning(f"Found {final_duplicates} new duplicates after processing, removing them...")
-            data = data.drop_duplicates().reset_index(drop=True)
-            logger.info(f"Removed new duplicates, final shape: {data.shape}")
+        # Split and scale the data
+        X_train, X_test, y_train, y_test = self.split_and_scale_features(data)
         
-        logger.info(f"Completed data processing, final shape: {data.shape}")
+        logger.info(f"Completed data processing. Training set shape: {X_train.shape}, Test set shape: {X_test.shape}")
         
-        return data
+        return X_train, X_test, y_train, y_test

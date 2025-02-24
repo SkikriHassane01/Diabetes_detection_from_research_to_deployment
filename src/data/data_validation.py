@@ -25,7 +25,7 @@ class DataValidator:
                 'Sex', 'Age', 'Education', 'Income'
             ],
             'target_column': 'Diabetes_012',
-            'expected_classes': [0, 1, 2],
+            'expected_classes': [0, 1],
         }
         logger.info("DataValidator initialized with configuration")
     
