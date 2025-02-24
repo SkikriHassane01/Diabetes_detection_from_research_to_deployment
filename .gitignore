@@ -178,3 +178,6 @@ notebooks/models/optimized/optuna_study.pkl
 notebooks/catboost_info/tmp/cat_feature_index.8921ea84-37124abf-3d9487c5-b9390057.tmp
 notebooks/catboost_info/test/events.out.tfevents
 notebooks/catboost_info/tmp/cat_feature_index.b38246d4-5e31b676-845ff56a-4b61e06e.tmp
+notebooks/catboost_info/tmp/cat_feature_index.70894ecf-c4faeb3c-380e8732-6287452a.tmp
+notebooks/catboost_info/tmp/cat_feature_index.5ae65f07-b9774ada-a1d1bd41-9e9b7d46.tmp
+notebooks/catboost_info/tmp/cat_feature_index.5ae65f07-b9774ada-a1d1bd41-9e9b7d46.tmp
