@@ -2,24 +2,25 @@
 
 ## **Project Overview**
 
-This Project aims to develop a machine learning model to classify patients into three categories:
+![Diabetes](https://activo.co.za/wp-content/uploads/1-1-1400x788.png)
+
+This Project aims to develop a machine learning model to classify patients into two categories:
 
 - `No Diabetes (0)`
-- `Prediabetes (1)`
-- `Diabetes (2)`
+- `Diabetes (1)`
 
-The Model will achieve at least **+90% accuracy and recall**, wi will focus on the recall metric because the False negative (missed diagnoses, the patient is defected with the diabetes and the model predict that he is not) are more dangerous than false positive (can ruled out with additional tests). This classification model will eventually be integrated into a larger healthcare application that identifies multiple diseases.
+The Model will achieve at least **+90% accuracy and recall**, we will focus on the recall metric because False negatives (missed diagnoses, where a patient has diabetes but the model predicts they do not) are more dangerous than false positives (which can be ruled out with additional tests). This classification model will eventually be integrated into a larger healthcare application that identifies multiple diseases.
 
 ## **Project Objectives**
 
 - Develop a robust diabetes classification model with > 90% accuracy and recall
-- Address class imbalance
+- Address class imbalance in the dataset
 - Identify the most effective modeling technique through comparative analysis
-- Optimize hyperparameter using ***Optuna***
-- Implement MlOps best practices with ***ZenMl*** and ***MLflow***
+- Optimize hyperparameters using ***Optuna***
+- Implement MLOps best practices with ***ZenML*** and ***MLflow***
 - Create scalable, maintainable code using design patterns
-  - ***Scalable code***: Code that can grow without major rewrites.
-  - ***Maintainable code***: code that's easy to understand, modify, and debug (clear organization, will-documented, and following consistent standards)
+  - ***Scalable code***: Code that can grow without major rewrites
+  - ***Maintainable code***: Code that's easy to understand, modify, and debug (clear organization, well-documented, and following consistent standards)
 
 ## **Dataset Understanding**
 
@@ -27,34 +28,34 @@ The dataset includes:
 
 ### Target Variable
 
-- **Diabetes_012**: Diabetes classification (0: No diabetes, 1: Prediabetes, 2: Diabetes)
+- **diabetes**: Binary classification (0: No diabetes, 1: Diabetes)
 
 ### Features
 
+**Categorical Features**:
+
+- gender: Patient's gender
+- smoking_history: Patient's smoking history
+
 **Binary Features (0/1)**:
 
-- Health Indicators: HighBP, HighChol, CholCheck, Smoker, Stroke, HeartDiseaseorAttack, PhysActivity, etc.
-- Lifestyle: Fruits, Veggies, HvyAlcoholConsump
-- Healthcare Access: AnyHealthcare, NoDocbcCost
-- Physical Condition: DiffWalk
-- Demographics: Sex
+- hypertension: Indicates if patient has hypertension
+- heart_disease: Indicates if patient has heart disease
 
-**Continuous/Ordinal Features**:
+**Continuous Features**:
 
-- BMI: Body Mass Index
-- GenHlth: General Health (1-5 scale)
-- MentHlth: Mental Health Days
-- PhysHlth: Physical Health Days
-- Age: Age Category (1-13)
-- Education: Education Level
+- age: Age of the patient
+- bmi: Body Mass Index
+- HbA1c_level: Hemoglobin A1c level
+- blood_glucose_level: Blood glucose level
 
 ## **Data Pipeline Architecture**
 
-### ***1. Data Ingestion, validation, versioning***
+### ***1. Data Ingestion, Validation, Versioning***
 
 - Load raw data
 - Initial validation checks
-- Data versioning with MlFlow
+- Data versioning with MLflow
 
 ### ***2. Exploratory Data Analysis (EDA)***
 
@@ -66,40 +67,44 @@ The dataset includes:
 
 ### ***3. Data Processing***
 
-- Handling missing values
-- Handling the duplicated values
+- Handling missing values (if any)
+- Handling duplicated values
 - Outlier detection and treatment
 - Feature scaling for continuous variables
+- Encoding categorical variables
 - Data type validation and conversion
 
 ### ***4. Feature Engineering***
 
-- Create new Features like `HealthScoreCalculation` or `RiskScoreCalculation`...
+- Create composite health risk scores
+- Handle categorical variables (encoding)
+- Create interaction terms between relevant features
+- Normalize medical measurements
 
 ### ***5. Class Imbalance Handling***
 
-- Implementation of `SMOTE` for  synthetic data generation
+- Implementation of `SMOTE` for synthetic data generation
 - Evaluation of different SMOTE variants (Borderline-SMOTE, ADASYN)
 
 ## **Modeling Strategy**
 
 ### ***1. Baseline Model Evaluation***
 
-Evaluate multiple classification algorithm:
+Evaluate multiple classification algorithms:
 
 - ***Logistic Regression***
 - ***Random Forest***
 - ***XGBoost***
 - ***LightGBM***
 - ***CatBoost***
-- ***KNN***
 - ***Neural Networks***
 
 ### ***2. Model Selection Criteria***
 
 - Primary metrics: Accuracy and Recall (target >90%)
-- Secondary metrics: Precision, F1-Score, AUC-PR
+- Secondary metrics: Precision, F1-Score, AUC-ROC
 - Cross-validation using stratified k-fold (k=5)
+- Special focus on False Negative Rate
 
 ### ***3. Hyperparameter Optimization***
 
@@ -114,7 +119,7 @@ Evaluate multiple classification algorithm:
 ### ***1. Experiment Tracking with MLflow***
 
 - Track all experiments across different models
-- Log hyperparameter, metrics, and artifacts
+- Log hyperparameters, metrics, and artifacts
 - Version models and datasets
 - Compare experiment results
 
@@ -130,7 +135,7 @@ Evaluate multiple classification algorithm:
 - Configure caching for efficient iteration
 - Implement pipeline versioning
 
-### ***3. Continuous Integration/Continuous Deployment `(CI/CD)`***
+### ***3. Continuous Integration/Continuous Deployment (CI/CD)***
 
 This setup ensures reliable, production-ready ML models with automated quality checks and deployment processes.
 
@@ -147,19 +152,20 @@ This setup ensures reliable, production-ready ML models with automated quality c
 - Automated retraining based on drift thresholds
 - Alert system for performance degradation
 
-## **Technical Stack used in this project**
+## **Technical Stack**
 
 ### **Core Technologies**
 
 - **Programming Language**: Python 3.8+
 - **Data Processing**: Pandas, NumPy
-- **Machine Learning**: Scikit-learn, XGBoost, LightGBM, catboost
+- **Machine Learning**: Scikit-learn, XGBoost, LightGBM, CatBoost
+- **Deep Learning**: TensorFlow/Keras
 - **Visualization**: Matplotlib, Seaborn
 - **MLOps**: ZenML, MLflow
 
-### Development Tools
+### **Development Tools**
 
-- **Version Control**: Git, Github
-- **Virtual Environment**: Conda ...
+- **Version Control**: Git, GitHub
+- **Virtual Environment**: Conda
 - **Testing**: pytest
 - **Code Quality**: Black, Flake8, mypy
